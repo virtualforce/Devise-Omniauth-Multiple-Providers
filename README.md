@@ -1,0 +1,1 @@
+# Devise-Omniauth-Multiple-Providers
