@@ -32,46 +32,81 @@ rake db:migrate
 ```
 Now restart your server to get the changes
 
-## Step 2: Add migrations to create authentication_provider and user_authentication
+## Step 2: Generate models authentication_provider, user_authentication and social_account
 
-### authentication_provider Migration
+### authentication_provider
+
+Generate model
 
 ```
-class CreateAuthenticationProviders < ActiveRecord::Migration
-    def change
-        create_table "authentication_providers", :force => true do |t|
-            t.string   "name"
-            t.datetime "created_at",                 :null => false
-            t.datetime "updated_at",                 :null => false
-        end
-        add_index "authentication_providers", ["name"], :name => "index_name_on_authentication_providers"
-        AuthenticationProvider.create(name: 'facebook')
-        AuthenticationProvider.create(name: 'twitter')
-        AuthenticationProvider.create(name: 'gplus')
-        AuthenticationProvider.create(name: 'linkedin')
+rails g model authentication_provider
+```
+Replace the 'change' method in the authentication_provider migration with the method below
+
+```
+def change
+    create_table "authentication_providers", :force => true do |t|
+        t.string   "name"
+        t.datetime "created_at",                 :null => false
+        t.datetime "updated_at",                 :null => false
     end
-  end
+    add_index "authentication_providers", ["name"], :name => "index_name_on_authentication_providers"
+    AuthenticationProvider.create(name: 'facebook')
+    AuthenticationProvider.create(name: 'twitter')
+    AuthenticationProvider.create(name: 'gplus')
+    AuthenticationProvider.create(name: 'linkedin')
+end
 ```
 
-### user_authentication.rb Migration
+### user_authentication
+
+Generate model
 
 ```
-class CreateUserAuthentications < ActiveRecord::Migration
-    def change
-        create_table "user_authentications", :force => true do |t|
-            t.integer  "user_id"
-            t.integer  "authentication_provider_id"
-            t.string   "uid"
-            t.string   "token"
-            t.datetime "token_expires_at"
-            t.text     "params"
-            t.datetime "created_at",                 :null => false
-            t.datetime "updated_at",                 :null => false
-        end
-        add_index "user_authentications", ["authentication_provider_id"], :name => "index_user_authentications_on_authentication_provider_id"
-        add_index "user_authentications", ["user_id"], :name => "index_user_authentications_on_user_id"
+rails g model user_authentication
+```
+Replace the 'change' method in the user_authentication migration with the method below
+
+```
+
+def change
+    create_table "user_authentications", :force => true do |t|
+        t.integer  "user_id"
+        t.integer  "authentication_provider_id"
+        t.string   "uid"
+        t.string   "token"
+        t.datetime "token_expires_at"
+        t.text     "params"
+        t.datetime "created_at",                 :null => false
+        t.datetime "updated_at",                 :null => false
     end
-  end
+    add_index "user_authentications", ["authentication_provider_id"], :name => "index_user_authentications_on_authentication_provider_id"
+    add_index "user_authentications", ["user_id"], :name => "index_user_authentications_on_user_id"
+end
+
+```
+### social_account
+
+Generate model
+
+```
+rails g model social_account
+```
+Replace the 'change' method in the social_account migration with the method below
+
+```
+
+def change
+    create_table :social_accounts do |t|
+      t.string :token
+      t.string :secret
+      t.references :user, foreign_key: true
+      t.references :authentication_provider, foreign_key: true
+
+      t.timestamps
+    end
+end
+
 ```
 
 Run the migrations with following command
@@ -80,11 +115,13 @@ Run the migrations with following command
 rake db:migrate
 ```
 
-## Step 3: Add Associations in authentication_provider and user_authentication
+
+## Step 3: Add Associations in authentication_provider, user_authentication and social_account
 
 ### authentication_provider.rb
 
 ```
+has_many :social_accounts
 has_many :users
 has_many :user_authentications
 ```
@@ -109,8 +146,29 @@ has_many :user_authentications
             )
   end
 ```
+### social_account.rb
 
-## Step 4: Create Controller users/omniauth_callbacks_controller.rb
+```
+belongs_to :user
+belongs_to :authentication_provider
+```
+## Step 5: Create scope in authentication_provider and social_account
+
+### authentication_provider.rb
+
+```
+scope :get_provider_name, -> (provider_name) {where("name = ?",provider_name)}
+```
+
+### social_account.rb
+
+```
+scope :get_provider_account , -> (user_id,auth_provider_id) { where("user_id = ? and authentication_provider_id = ? ",user_id,auth_provider_id) }
+scope :get_provider_name_account , -> (user_id,auth_provider_name) { where("user_id = ? and authentication_providers.name = ? ",user_id,auth_provider_name).joins(:authentication_provider) }
+```
+
+
+## Step 5: Create Controller users/omniauth_callbacks_controller.rb
 
 ```
   class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
@@ -128,7 +186,7 @@ has_many :user_authentications
   devise_for :users, controllers: {omniauth_callbacks: 'users/omniauth_callbacks'}
 ```
 
-## Step 5: Create Controller Concern omni_concern.rb
+## Step 6: Create Controller Concern omni_concern.rb
 
 ```
   module OmniConcern
@@ -166,7 +224,7 @@ has_many :user_authentications
   end
 ```
 
-## Step 6: Add following code to user.rb
+## Step 7: Add following code to user.rb
 
 ```
   include OmniauthAttributesConcern
@@ -179,7 +237,7 @@ has_many :user_authentications
       self.send(params.provider,params)
   end
 ```
-## Step 7: Add Model Concern omniauth_attributes_concern.rb
+## Step 8: Add Model Concern omniauth_attributes_concern.rb
 
 ```
   module OmniauthAttributesConcern
@@ -215,7 +273,7 @@ In this concern we can create Methods for each social media to fetch and store a
 
 ### Note the above example is meant for carrierwave gem and 'image' in remote_image_url is the DB column. You can use any other gem and pass params['info']['image'] to it.
 
-## Step 8: Add Social Media Account Keys in devise.rb
+## Step 9: Add Social Media Account Keys in devise.rb
 
 ### For Facebook
 
@@ -243,7 +301,7 @@ In this concern we can create Methods for each social media to fetch and store a
 
 ### Note: display: "popup" attribute is used when we want social media signup to open in a separate browser window
 
-## Final Step 9: Add Gems in Gemfile for Omniauth
+## Final Step 10: Add Gems in Gemfile for Omniauth
 
 ```
   gem 'omniauth-oauth2' , '~> 1.3.1'
