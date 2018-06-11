@@ -152,7 +152,7 @@ has_many :user_authentications
 belongs_to :user
 belongs_to :authentication_provider
 ```
-## Step 5: Create scope in authentication_provider and social_account
+## Step 4: Create scope in authentication_provider and social_account
 
 ### authentication_provider.rb
 
